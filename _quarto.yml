@@ -10,7 +10,7 @@ website:
         text: Home
       - href: about.qmd
         text: About
-  site-url: "https://<your-username>.github.io/math437ArthurChangfinal"
+  site-url: "https://arthu-r-c.github.io/math437ArthurChangfinal.github.io/"
 
 format:
   html:
