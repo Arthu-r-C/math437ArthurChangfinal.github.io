@@ -19,7 +19,7 @@ My background as a stats and probability major inspired me to analyze this throu
 #| message: false
 
 # change this to the location of your Quarto file containing your project; then delete this comment
-here::i_am("ArthurChang437Final/math-437-project-template (1).qmd")
+here::i_am("ArthurChang437Final/index.qmd")
 ```
 
 ## Main Objective
@@ -155,7 +155,7 @@ if (length(unique_platforms) == 0) {
   stop("Error: No unique platforms identified. Check platform column data.")
 }
 
-# Break pipeline into steps for debugging
+
 cat("Renaming columns\n")
 smmh_clean <- smmh_clean %>%
   rename(
