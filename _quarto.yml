@@ -1,19 +1,19 @@
 project:
   type: website
+  output-dir: docs  # Use 'docs' for main / docs, or '_site' for gh-pages
 
 website:
-  title: "ArthurChang437Final"
+  title: "My Site"
   navbar:
     left:
       - href: index.qmd
         text: Home
-      - about.qmd
+      - href: about.qmd
+        text: About
+  site-url: "https://<your-username>.github.io/math437ArthurChangfinal"
 
 format:
   html:
     theme: cosmo
     css: styles.css
     toc: true
-
-editor: visual
-
