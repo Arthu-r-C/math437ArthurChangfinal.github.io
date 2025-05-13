@@ -43,6 +43,10 @@ library(ggplot2)
 library(rsample)
 library(skimr)
 library(corrplot)
+library(naniar)
+library(tidyr)
+library(stringr)
+library(purrr)
 ```
 
 
@@ -55,6 +59,10 @@ library(corrplot)
 | [ggplot2](https://ggplot2.tidyverse.org/) | to create nice-looking and informative graphs | # For correlation matrix visualization
 | [skimr](https://cran.r-project.org/web/packages/skimr/index.html/) | to create summary statistics |
 | [corrplot](https://cran.r-project.org/web/packages/corrplot/vignettes/corrplot-intro.html/) | to visualize correlation matrices |
+[Naniar] [tidyr]https://tidyr.tidyverse.org//) | remove missing data |
+[Stringr](https://cran.r-project.org/web/packages/corrplot/vignettes/corrplot-intro.html/) | to create dummy variables from responses. |
+[tidyr]https://tidyr.tidyverse.org//) | remove missing data |
+
 ## Data Description
 I am using the ‘Social Media and Mental Health’ dataset, compiled by Souvik Ahmed and sourced from Kaggle (https://www.kaggle.com/datasets/souvikahmed071/social-media-and-mental-health?select=smmh.csv),. The dataset was acquired through an online survey, likely administered via Google Forms, and distributed via fliers at the University of Liberal Arts Bangladesh (ULAB) in Dhaka.
 
