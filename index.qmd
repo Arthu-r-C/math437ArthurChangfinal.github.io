@@ -19,7 +19,7 @@ My background as a stats and probability major inspired me to analyze this throu
 #| message: false
 
 # change this to the location of your Quarto file containing your project; then delete this comment
-here::i_am("My-Portfolio-Math-437/math-437-project-template (1).qmd")
+here::i_am("ArthurChang437Final/math-437-project-template (1).qmd")
 ```
 
 ## Main Objective
