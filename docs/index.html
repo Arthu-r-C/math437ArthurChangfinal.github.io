@@ -208,7 +208,9 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(naniar)</span>
 <span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(tidyr)</span>
 <span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(stringr)</span>
-<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(purrr)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(purrr)</span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(tidymodels)</span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(recipes)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <table class="caption-top table">
 <thead>
@@ -257,6 +259,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <tr class="even">
 <td>[tidyr]https://tidyr.tidyverse.org//)</td>
 <td>remove missing data</td>
+</tr>
+<tr class="odd">
+<td>[tidymodels]https://tidyr.tidyverse.org//)</td>
+<td>to facilitate modeling</td>
 </tr>
 </tbody>
 </table>
@@ -870,11 +876,356 @@ Group variables            None
 </section>
 <section id="modeling" class="level2">
 <h2 class="anchored" data-anchor-id="modeling">Modeling</h2>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb87"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb87-1"><a href="#cb87-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Set seed for reproducibility</span></span>
+<span id="cb87-2"><a href="#cb87-2" aria-hidden="true" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">69</span>)</span>
+<span id="cb87-3"><a href="#cb87-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb87-4"><a href="#cb87-4" aria-hidden="true" tabindex="-1"></a><span class="co"># 1. Data Preparation</span></span>
+<span id="cb87-5"><a href="#cb87-5" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"Step 1: Preparing Data for Modeling</span><span class="sc">\n</span><span class="st">"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Step 1: Preparing Data for Modeling</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb89"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb89-1"><a href="#cb89-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Select relevant variables for modeling</span></span>
+<span id="cb89-2"><a href="#cb89-2" aria-hidden="true" tabindex="-1"></a>model_data <span class="ot">&lt;-</span> smmh_clean <span class="sc">%&gt;%</span></span>
+<span id="cb89-3"><a href="#cb89-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(</span>
+<span id="cb89-4"><a href="#cb89-4" aria-hidden="true" tabindex="-1"></a>    time_spent, platform_facebook, platform_reddit, platform_discord,</span>
+<span id="cb89-5"><a href="#cb89-5" aria-hidden="true" tabindex="-1"></a>    depression, worry, concentration_difficulty, restlessness, comparison_freq,</span>
+<span id="cb89-6"><a href="#cb89-6" aria-hidden="true" tabindex="-1"></a>    age, gender, occupation, affiliation</span>
+<span id="cb89-7"><a href="#cb89-7" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">%&gt;%</span></span>
+<span id="cb89-8"><a href="#cb89-8" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Ensure no missing values in predictors and outcomes</span></span>
+<span id="cb89-9"><a href="#cb89-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">drop_na</span>(time_spent, platform_facebook, platform_reddit, platform_discord, age, gender, occupation, affiliation,</span>
+<span id="cb89-10"><a href="#cb89-10" aria-hidden="true" tabindex="-1"></a>          depression, worry, concentration_difficulty, restlessness, comparison_freq)</span>
+<span id="cb89-11"><a href="#cb89-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb89-12"><a href="#cb89-12" aria-hidden="true" tabindex="-1"></a><span class="co"># Check if data is sufficient</span></span>
+<span id="cb89-13"><a href="#cb89-13" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"Rows in model_data:"</span>, <span class="fu">nrow</span>(model_data), <span class="st">"</span><span class="sc">\n</span><span class="st">"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Rows in model_data: 481 </code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb91"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb91-1"><a href="#cb91-1" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> (<span class="fu">nrow</span>(model_data) <span class="sc">==</span> <span class="dv">0</span>) {</span>
+<span id="cb91-2"><a href="#cb91-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">stop</span>(<span class="st">"Error: model_data has no rows after drop_na(). Check missing data."</span>)</span>
+<span id="cb91-3"><a href="#cb91-3" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb91-4"><a href="#cb91-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb91-5"><a href="#cb91-5" aria-hidden="true" tabindex="-1"></a><span class="co"># Verify platform variables exist</span></span>
+<span id="cb91-6"><a href="#cb91-6" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"Available columns:"</span>, <span class="fu">colnames</span>(model_data), <span class="st">"</span><span class="sc">\n</span><span class="st">"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Available columns: time_spent platform_facebook platform_reddit platform_discord depression worry concentration_difficulty restlessness comparison_freq age gender occupation affiliation </code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb93"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb93-1"><a href="#cb93-1" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> (<span class="sc">!</span><span class="fu">all</span>(<span class="fu">c</span>(<span class="st">"platform_facebook"</span>, <span class="st">"platform_reddit"</span>, <span class="st">"platform_discord"</span>) <span class="sc">%in%</span> <span class="fu">colnames</span>(model_data))) {</span>
+<span id="cb93-2"><a href="#cb93-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">stop</span>(<span class="st">"Error: One or more platform variables (platform_facebook, platform_reddit, platform_discord) are missing. Check data wrangling."</span>)</span>
+<span id="cb93-3"><a href="#cb93-3" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb93-4"><a href="#cb93-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb93-5"><a href="#cb93-5" aria-hidden="true" tabindex="-1"></a><span class="co"># Split data into training (70%) and testing (30%) sets</span></span>
+<span id="cb93-6"><a href="#cb93-6" aria-hidden="true" tabindex="-1"></a>data_split <span class="ot">&lt;-</span> <span class="fu">initial_split</span>(model_data, <span class="at">prop =</span> <span class="fl">0.7</span>, <span class="at">strata =</span> depression)</span>
+<span id="cb93-7"><a href="#cb93-7" aria-hidden="true" tabindex="-1"></a>train_data <span class="ot">&lt;-</span> <span class="fu">training</span>(data_split)</span>
+<span id="cb93-8"><a href="#cb93-8" aria-hidden="true" tabindex="-1"></a>test_data <span class="ot">&lt;-</span> <span class="fu">testing</span>(data_split)</span>
+<span id="cb93-9"><a href="#cb93-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb93-10"><a href="#cb93-10" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"Training set rows:"</span>, <span class="fu">nrow</span>(train_data), <span class="st">"</span><span class="sc">\n</span><span class="st">"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Training set rows: 335 </code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb95"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb95-1"><a href="#cb95-1" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"Testing set rows:"</span>, <span class="fu">nrow</span>(test_data), <span class="st">"</span><span class="sc">\n</span><span class="st">"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Testing set rows: 146 </code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb97"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb97-1"><a href="#cb97-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Define mental health outcomes to model</span></span>
+<span id="cb97-2"><a href="#cb97-2" aria-hidden="true" tabindex="-1"></a>outcomes <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">"depression"</span>, <span class="st">"worry"</span>, <span class="st">"concentration_difficulty"</span>, <span class="st">"restlessness"</span>, <span class="st">"comparison_freq"</span>)</span>
+<span id="cb97-3"><a href="#cb97-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb97-4"><a href="#cb97-4" aria-hidden="true" tabindex="-1"></a><span class="co"># 2. Modeling Function</span></span>
+<span id="cb97-5"><a href="#cb97-5" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"Step 2: Defining Modeling Function</span><span class="sc">\n</span><span class="st">"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Step 2: Defining Modeling Function</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb99"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb99-1"><a href="#cb99-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Function to fit and evaluate models for a given outcome</span></span>
+<span id="cb99-2"><a href="#cb99-2" aria-hidden="true" tabindex="-1"></a>fit_and_evaluate <span class="ot">&lt;-</span> <span class="cf">function</span>(outcome) {</span>
+<span id="cb99-3"><a href="#cb99-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">cat</span>(<span class="st">"</span><span class="sc">\n</span><span class="st">Modeling for outcome:"</span>, outcome, <span class="st">"</span><span class="sc">\n</span><span class="st">"</span>)</span>
+<span id="cb99-4"><a href="#cb99-4" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb99-5"><a href="#cb99-5" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Verify outcome exists in test_data</span></span>
+<span id="cb99-6"><a href="#cb99-6" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="sc">!</span>outcome <span class="sc">%in%</span> <span class="fu">colnames</span>(test_data)) {</span>
+<span id="cb99-7"><a href="#cb99-7" aria-hidden="true" tabindex="-1"></a>    <span class="fu">stop</span>(<span class="st">"Error: Outcome "</span>, outcome, <span class="st">" not found in test_data."</span>)</span>
+<span id="cb99-8"><a href="#cb99-8" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb99-9"><a href="#cb99-9" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb99-10"><a href="#cb99-10" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Create recipe for preprocessing</span></span>
+<span id="cb99-11"><a href="#cb99-11" aria-hidden="true" tabindex="-1"></a>  model_recipe <span class="ot">&lt;-</span> <span class="fu">recipe</span>(<span class="fu">as.formula</span>(<span class="fu">paste</span>(outcome, <span class="st">"~ time_spent + platform_facebook + platform_reddit + platform_discord + age + gender + occupation + affiliation"</span>)), </span>
+<span id="cb99-12"><a href="#cb99-12" aria-hidden="true" tabindex="-1"></a>                         <span class="at">data =</span> train_data) <span class="sc">%&gt;%</span></span>
+<span id="cb99-13"><a href="#cb99-13" aria-hidden="true" tabindex="-1"></a>    <span class="fu">step_dummy</span>(<span class="fu">all_nominal_predictors</span>()) <span class="sc">%&gt;%</span>           <span class="co"># Convert categorical variables to dummy variables</span></span>
+<span id="cb99-14"><a href="#cb99-14" aria-hidden="true" tabindex="-1"></a>    <span class="fu">step_zv</span>(<span class="fu">all_predictors</span>()) <span class="sc">%&gt;%</span>                     <span class="co"># Remove zero-variance predictors</span></span>
+<span id="cb99-15"><a href="#cb99-15" aria-hidden="true" tabindex="-1"></a>    <span class="fu">step_corr</span>(<span class="fu">all_numeric_predictors</span>(), <span class="at">threshold =</span> <span class="fl">0.9</span>) <span class="sc">%&gt;%</span>  <span class="co"># Remove highly correlated predictors</span></span>
+<span id="cb99-16"><a href="#cb99-16" aria-hidden="true" tabindex="-1"></a>    <span class="fu">step_normalize</span>(<span class="fu">all_numeric_predictors</span>())          <span class="co"># Normalize numeric predictors</span></span>
+<span id="cb99-17"><a href="#cb99-17" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb99-18"><a href="#cb99-18" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Define models</span></span>
+<span id="cb99-19"><a href="#cb99-19" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Linear Regression</span></span>
+<span id="cb99-20"><a href="#cb99-20" aria-hidden="true" tabindex="-1"></a>  lm_spec <span class="ot">&lt;-</span> <span class="fu">linear_reg</span>() <span class="sc">%&gt;%</span></span>
+<span id="cb99-21"><a href="#cb99-21" aria-hidden="true" tabindex="-1"></a>    <span class="fu">set_engine</span>(<span class="st">"lm"</span>)</span>
+<span id="cb99-22"><a href="#cb99-22" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb99-23"><a href="#cb99-23" aria-hidden="true" tabindex="-1"></a>  <span class="co"># KNN</span></span>
+<span id="cb99-24"><a href="#cb99-24" aria-hidden="true" tabindex="-1"></a>  knn_spec <span class="ot">&lt;-</span> <span class="fu">nearest_neighbor</span>(<span class="at">neighbors =</span> <span class="fu">tune</span>()) <span class="sc">%&gt;%</span></span>
+<span id="cb99-25"><a href="#cb99-25" aria-hidden="true" tabindex="-1"></a>    <span class="fu">set_engine</span>(<span class="st">"kknn"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb99-26"><a href="#cb99-26" aria-hidden="true" tabindex="-1"></a>    <span class="fu">set_mode</span>(<span class="st">"regression"</span>)</span>
+<span id="cb99-27"><a href="#cb99-27" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb99-28"><a href="#cb99-28" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Regression Tree</span></span>
+<span id="cb99-29"><a href="#cb99-29" aria-hidden="true" tabindex="-1"></a>  tree_spec <span class="ot">&lt;-</span> <span class="fu">decision_tree</span>(<span class="at">tree_depth =</span> <span class="fu">tune</span>(), <span class="at">min_n =</span> <span class="fu">tune</span>()) <span class="sc">%&gt;%</span></span>
+<span id="cb99-30"><a href="#cb99-30" aria-hidden="true" tabindex="-1"></a>    <span class="fu">set_engine</span>(<span class="st">"rpart"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb99-31"><a href="#cb99-31" aria-hidden="true" tabindex="-1"></a>    <span class="fu">set_mode</span>(<span class="st">"regression"</span>)</span>
+<span id="cb99-32"><a href="#cb99-32" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb99-33"><a href="#cb99-33" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Create workflows</span></span>
+<span id="cb99-34"><a href="#cb99-34" aria-hidden="true" tabindex="-1"></a>  lm_workflow <span class="ot">&lt;-</span> <span class="fu">workflow</span>() <span class="sc">%&gt;%</span></span>
+<span id="cb99-35"><a href="#cb99-35" aria-hidden="true" tabindex="-1"></a>    <span class="fu">add_recipe</span>(model_recipe) <span class="sc">%&gt;%</span></span>
+<span id="cb99-36"><a href="#cb99-36" aria-hidden="true" tabindex="-1"></a>    <span class="fu">add_model</span>(lm_spec)</span>
+<span id="cb99-37"><a href="#cb99-37" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb99-38"><a href="#cb99-38" aria-hidden="true" tabindex="-1"></a>  knn_workflow <span class="ot">&lt;-</span> <span class="fu">workflow</span>() <span class="sc">%&gt;%</span></span>
+<span id="cb99-39"><a href="#cb99-39" aria-hidden="true" tabindex="-1"></a>    <span class="fu">add_recipe</span>(model_recipe) <span class="sc">%&gt;%</span></span>
+<span id="cb99-40"><a href="#cb99-40" aria-hidden="true" tabindex="-1"></a>    <span class="fu">add_model</span>(knn_spec)</span>
+<span id="cb99-41"><a href="#cb99-41" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb99-42"><a href="#cb99-42" aria-hidden="true" tabindex="-1"></a>  tree_workflow <span class="ot">&lt;-</span> <span class="fu">workflow</span>() <span class="sc">%&gt;%</span></span>
+<span id="cb99-43"><a href="#cb99-43" aria-hidden="true" tabindex="-1"></a>    <span class="fu">add_recipe</span>(model_recipe) <span class="sc">%&gt;%</span></span>
+<span id="cb99-44"><a href="#cb99-44" aria-hidden="true" tabindex="-1"></a>    <span class="fu">add_model</span>(tree_spec)</span>
+<span id="cb99-45"><a href="#cb99-45" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb99-46"><a href="#cb99-46" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Cross-validation</span></span>
+<span id="cb99-47"><a href="#cb99-47" aria-hidden="true" tabindex="-1"></a>  cv_folds <span class="ot">&lt;-</span> <span class="fu">vfold_cv</span>(train_data, <span class="at">v =</span> <span class="dv">5</span>)</span>
+<span id="cb99-48"><a href="#cb99-48" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb99-49"><a href="#cb99-49" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Tune KNN</span></span>
+<span id="cb99-50"><a href="#cb99-50" aria-hidden="true" tabindex="-1"></a>  knn_grid <span class="ot">&lt;-</span> <span class="fu">grid_regular</span>(</span>
+<span id="cb99-51"><a href="#cb99-51" aria-hidden="true" tabindex="-1"></a>    <span class="fu">neighbors</span>(<span class="at">range =</span> <span class="fu">c</span>(<span class="dv">3</span>, <span class="dv">15</span>)),</span>
+<span id="cb99-52"><a href="#cb99-52" aria-hidden="true" tabindex="-1"></a>    <span class="at">levels =</span> <span class="dv">3</span></span>
+<span id="cb99-53"><a href="#cb99-53" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb99-54"><a href="#cb99-54" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb99-55"><a href="#cb99-55" aria-hidden="true" tabindex="-1"></a>  knn_tune <span class="ot">&lt;-</span> <span class="fu">tune_grid</span>(</span>
+<span id="cb99-56"><a href="#cb99-56" aria-hidden="true" tabindex="-1"></a>    knn_workflow,</span>
+<span id="cb99-57"><a href="#cb99-57" aria-hidden="true" tabindex="-1"></a>    <span class="at">resamples =</span> cv_folds,</span>
+<span id="cb99-58"><a href="#cb99-58" aria-hidden="true" tabindex="-1"></a>    <span class="at">grid =</span> knn_grid,</span>
+<span id="cb99-59"><a href="#cb99-59" aria-hidden="true" tabindex="-1"></a>    <span class="at">metrics =</span> <span class="fu">metric_set</span>(rmse, rsq)</span>
+<span id="cb99-60"><a href="#cb99-60" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb99-61"><a href="#cb99-61" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb99-62"><a href="#cb99-62" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Tune Regression Tree</span></span>
+<span id="cb99-63"><a href="#cb99-63" aria-hidden="true" tabindex="-1"></a>  tree_grid <span class="ot">&lt;-</span> <span class="fu">grid_regular</span>(</span>
+<span id="cb99-64"><a href="#cb99-64" aria-hidden="true" tabindex="-1"></a>    <span class="fu">tree_depth</span>(<span class="at">range =</span> <span class="fu">c</span>(<span class="dv">3</span>, <span class="dv">10</span>)),</span>
+<span id="cb99-65"><a href="#cb99-65" aria-hidden="true" tabindex="-1"></a>    <span class="fu">min_n</span>(<span class="at">range =</span> <span class="fu">c</span>(<span class="dv">5</span>, <span class="dv">20</span>)),</span>
+<span id="cb99-66"><a href="#cb99-66" aria-hidden="true" tabindex="-1"></a>    <span class="at">levels=</span><span class="dv">3</span></span>
+<span id="cb99-67"><a href="#cb99-67" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb99-68"><a href="#cb99-68" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb99-69"><a href="#cb99-69" aria-hidden="true" tabindex="-1"></a>  tree_tune <span class="ot">&lt;-</span> <span class="fu">tune_grid</span>(</span>
+<span id="cb99-70"><a href="#cb99-70" aria-hidden="true" tabindex="-1"></a>    tree_workflow,</span>
+<span id="cb99-71"><a href="#cb99-71" aria-hidden="true" tabindex="-1"></a>    <span class="at">resamples =</span> cv_folds,</span>
+<span id="cb99-72"><a href="#cb99-72" aria-hidden="true" tabindex="-1"></a>    <span class="at">grid =</span> tree_grid,</span>
+<span id="cb99-73"><a href="#cb99-73" aria-hidden="true" tabindex="-1"></a>    <span class="at">metrics =</span> <span class="fu">metric_set</span>(rmse, rsq)</span>
+<span id="cb99-74"><a href="#cb99-74" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb99-75"><a href="#cb99-75" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb99-76"><a href="#cb99-76" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Fit Linear Regression (no tuning needed)</span></span>
+<span id="cb99-77"><a href="#cb99-77" aria-hidden="true" tabindex="-1"></a>  lm_fit <span class="ot">&lt;-</span> <span class="fu">fit</span>(lm_workflow, train_data)</span>
+<span id="cb99-78"><a href="#cb99-78" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb99-79"><a href="#cb99-79" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Select best KNN and Tree models</span></span>
+<span id="cb99-80"><a href="#cb99-80" aria-hidden="true" tabindex="-1"></a>  best_knn <span class="ot">&lt;-</span> <span class="fu">finalize_workflow</span>(knn_workflow, <span class="fu">select_best</span>(knn_tune, <span class="at">metric =</span> <span class="st">"rmse"</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb99-81"><a href="#cb99-81" aria-hidden="true" tabindex="-1"></a>    <span class="fu">fit</span>(train_data)</span>
+<span id="cb99-82"><a href="#cb99-82" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb99-83"><a href="#cb99-83" aria-hidden="true" tabindex="-1"></a>  best_tree <span class="ot">&lt;-</span> <span class="fu">finalize_workflow</span>(tree_workflow, <span class="fu">select_best</span>(tree_tune, <span class="at">metric =</span> <span class="st">"rmse"</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb99-84"><a href="#cb99-84" aria-hidden="true" tabindex="-1"></a>    <span class="fu">fit</span>(train_data)</span>
+<span id="cb99-85"><a href="#cb99-85" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb99-86"><a href="#cb99-86" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Evaluate on test set</span></span>
+<span id="cb99-87"><a href="#cb99-87" aria-hidden="true" tabindex="-1"></a>  test_predictions <span class="ot">&lt;-</span> <span class="fu">bind_rows</span>(</span>
+<span id="cb99-88"><a href="#cb99-88" aria-hidden="true" tabindex="-1"></a>    <span class="fu">tibble</span>(</span>
+<span id="cb99-89"><a href="#cb99-89" aria-hidden="true" tabindex="-1"></a>      <span class="at">.pred =</span> <span class="fu">predict</span>(lm_fit, test_data)<span class="sc">$</span>.pred,</span>
+<span id="cb99-90"><a href="#cb99-90" aria-hidden="true" tabindex="-1"></a>      <span class="at">model =</span> <span class="st">"Linear Regression"</span>,</span>
+<span id="cb99-91"><a href="#cb99-91" aria-hidden="true" tabindex="-1"></a>      <span class="at">actual =</span> test_data[[outcome]]</span>
+<span id="cb99-92"><a href="#cb99-92" aria-hidden="true" tabindex="-1"></a>    ),</span>
+<span id="cb99-93"><a href="#cb99-93" aria-hidden="true" tabindex="-1"></a>    <span class="fu">tibble</span>(</span>
+<span id="cb99-94"><a href="#cb99-94" aria-hidden="true" tabindex="-1"></a>      <span class="at">.pred =</span> <span class="fu">predict</span>(best_knn, test_data)<span class="sc">$</span>.pred,</span>
+<span id="cb99-95"><a href="#cb99-95" aria-hidden="true" tabindex="-1"></a>      <span class="at">model =</span> <span class="st">"KNN"</span>,</span>
+<span id="cb99-96"><a href="#cb99-96" aria-hidden="true" tabindex="-1"></a>      <span class="at">actual =</span> test_data[[outcome]]</span>
+<span id="cb99-97"><a href="#cb99-97" aria-hidden="true" tabindex="-1"></a>    ),</span>
+<span id="cb99-98"><a href="#cb99-98" aria-hidden="true" tabindex="-1"></a>    <span class="fu">tibble</span>(</span>
+<span id="cb99-99"><a href="#cb99-99" aria-hidden="true" tabindex="-1"></a>      <span class="at">.pred =</span> <span class="fu">predict</span>(best_tree, test_data)<span class="sc">$</span>.pred,</span>
+<span id="cb99-100"><a href="#cb99-100" aria-hidden="true" tabindex="-1"></a>      <span class="at">model =</span> <span class="st">"Regression Tree"</span>,</span>
+<span id="cb99-101"><a href="#cb99-101" aria-hidden="true" tabindex="-1"></a>      <span class="at">actual =</span> test_data[[outcome]]</span>
+<span id="cb99-102"><a href="#cb99-102" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb99-103"><a href="#cb99-103" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb99-104"><a href="#cb99-104" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb99-105"><a href="#cb99-105" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Calculate performance metrics</span></span>
+<span id="cb99-106"><a href="#cb99-106" aria-hidden="true" tabindex="-1"></a>  metrics <span class="ot">&lt;-</span> test_predictions <span class="sc">%&gt;%</span></span>
+<span id="cb99-107"><a href="#cb99-107" aria-hidden="true" tabindex="-1"></a>    <span class="fu">group_by</span>(model) <span class="sc">%&gt;%</span></span>
+<span id="cb99-108"><a href="#cb99-108" aria-hidden="true" tabindex="-1"></a>    <span class="fu">summarise</span>(</span>
+<span id="cb99-109"><a href="#cb99-109" aria-hidden="true" tabindex="-1"></a>      <span class="at">RMSE =</span> <span class="fu">sqrt</span>(<span class="fu">mean</span>((.pred <span class="sc">-</span> actual)<span class="sc">^</span><span class="dv">2</span>)),</span>
+<span id="cb99-110"><a href="#cb99-110" aria-hidden="true" tabindex="-1"></a>      <span class="at">Rsq =</span> <span class="fu">cor</span>(.pred, actual)<span class="sc">^</span><span class="dv">2</span></span>
+<span id="cb99-111"><a href="#cb99-111" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb99-112"><a href="#cb99-112" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb99-113"><a href="#cb99-113" aria-hidden="true" tabindex="-1"></a>  <span class="fu">cat</span>(<span class="st">"Performance metrics for"</span>, outcome, <span class="st">":</span><span class="sc">\n</span><span class="st">"</span>)</span>
+<span id="cb99-114"><a href="#cb99-114" aria-hidden="true" tabindex="-1"></a>  <span class="fu">print</span>(metrics)</span>
+<span id="cb99-115"><a href="#cb99-115" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb99-116"><a href="#cb99-116" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Visualize predictions vs. actual</span></span>
+<span id="cb99-117"><a href="#cb99-117" aria-hidden="true" tabindex="-1"></a>  pred_plot <span class="ot">&lt;-</span> <span class="fu">ggplot</span>(test_predictions, <span class="fu">aes</span>(<span class="at">x =</span> actual, <span class="at">y =</span> .pred, <span class="at">color =</span> model)) <span class="sc">+</span></span>
+<span id="cb99-118"><a href="#cb99-118" aria-hidden="true" tabindex="-1"></a>    <span class="fu">geom_point</span>(<span class="at">alpha =</span> <span class="fl">0.5</span>) <span class="sc">+</span></span>
+<span id="cb99-119"><a href="#cb99-119" aria-hidden="true" tabindex="-1"></a>    <span class="fu">geom_abline</span>(<span class="at">slope =</span> <span class="dv">1</span>, <span class="at">intercept =</span> <span class="dv">0</span>, <span class="at">linetype =</span> <span class="st">"dashed"</span>) <span class="sc">+</span></span>
+<span id="cb99-120"><a href="#cb99-120" aria-hidden="true" tabindex="-1"></a>    <span class="fu">facet_wrap</span>(<span class="sc">~</span> model) <span class="sc">+</span></span>
+<span id="cb99-121"><a href="#cb99-121" aria-hidden="true" tabindex="-1"></a>    <span class="fu">labs</span>(<span class="at">title =</span> <span class="fu">paste</span>(<span class="st">"Predictions vs. Actual for"</span>, outcome),</span>
+<span id="cb99-122"><a href="#cb99-122" aria-hidden="true" tabindex="-1"></a>         <span class="at">x =</span> <span class="st">"Actual Score"</span>, <span class="at">y =</span> <span class="st">"Predicted Score"</span>) <span class="sc">+</span></span>
+<span id="cb99-123"><a href="#cb99-123" aria-hidden="true" tabindex="-1"></a>    <span class="fu">theme_minimal</span>()</span>
+<span id="cb99-124"><a href="#cb99-124" aria-hidden="true" tabindex="-1"></a>  <span class="fu">print</span>(pred_plot)</span>
+<span id="cb99-125"><a href="#cb99-125" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb99-126"><a href="#cb99-126" aria-hidden="true" tabindex="-1"></a>  <span class="fu">return</span>(<span class="fu">list</span>(<span class="at">metrics =</span> metrics, <span class="at">predictions =</span> test_predictions))</span>
+<span id="cb99-127"><a href="#cb99-127" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb99-128"><a href="#cb99-128" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb99-129"><a href="#cb99-129" aria-hidden="true" tabindex="-1"></a><span class="co"># 3. Fit Models for All Outcomes</span></span>
+<span id="cb99-130"><a href="#cb99-130" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"Step 3: Fitting Models for All Outcomes</span><span class="sc">\n</span><span class="st">"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Step 3: Fitting Models for All Outcomes</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb101"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb101-1"><a href="#cb101-1" aria-hidden="true" tabindex="-1"></a>results <span class="ot">&lt;-</span> <span class="fu">map</span>(outcomes, fit_and_evaluate)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+Modeling for outcome: depression </code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Warning: package 'kknn' was built under R version 4.4.3</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Warning: package 'rpart' was built under R version 4.4.3</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Performance metrics for depression :
+# A tibble: 3 × 3
+  model              RMSE    Rsq
+  &lt;chr&gt;             &lt;dbl&gt;  &lt;dbl&gt;
+1 KNN                1.30 0.0540
+2 Linear Regression  1.26 0.0968
+3 Regression Tree    1.20 0.162 </code></pre>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="index_files/figure-html/unnamed-chunk-8-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+Modeling for outcome: worry 
+Performance metrics for worry :
+# A tibble: 3 × 3
+  model              RMSE    Rsq
+  &lt;chr&gt;             &lt;dbl&gt;  &lt;dbl&gt;
+1 KNN                1.34 0.0163
+2 Linear Regression  1.23 0.0838
+3 Regression Tree    1.25 0.0530</code></pre>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="index_files/figure-html/unnamed-chunk-8-2.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+Modeling for outcome: concentration_difficulty 
+Performance metrics for concentration_difficulty :
+# A tibble: 3 × 3
+  model              RMSE    Rsq
+  &lt;chr&gt;             &lt;dbl&gt;  &lt;dbl&gt;
+1 KNN                1.38 0.0341
+2 Linear Regression  1.38 0.0484
+3 Regression Tree    1.29 0.0997</code></pre>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="index_files/figure-html/unnamed-chunk-8-3.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+Modeling for outcome: restlessness 
+Performance metrics for restlessness :
+# A tibble: 3 × 3
+  model              RMSE    Rsq
+  &lt;chr&gt;             &lt;dbl&gt;  &lt;dbl&gt;
+1 KNN                1.20 0.0400
+2 Linear Regression  1.12 0.141 
+3 Regression Tree    1.14 0.118 </code></pre>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="index_files/figure-html/unnamed-chunk-8-4.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+Modeling for outcome: comparison_freq 
+Performance metrics for comparison_freq :
+# A tibble: 3 × 3
+  model              RMSE     Rsq
+  &lt;chr&gt;             &lt;dbl&gt;   &lt;dbl&gt;
+1 KNN                1.49 0.00958
+2 Linear Regression  1.37 0.0940 
+3 Regression Tree    1.46 0.00405</code></pre>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="index_files/figure-html/unnamed-chunk-8-5.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="sourceCode cell-code" id="cb110"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb110-1"><a href="#cb110-1" aria-hidden="true" tabindex="-1"></a><span class="co"># 4. Summarize Results</span></span>
+<span id="cb110-2"><a href="#cb110-2" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"Step 4: Summarizing Results Across Outcomes</span><span class="sc">\n</span><span class="st">"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Step 4: Summarizing Results Across Outcomes</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb112"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb112-1"><a href="#cb112-1" aria-hidden="true" tabindex="-1"></a>all_metrics <span class="ot">&lt;-</span> <span class="fu">map_dfr</span>(<span class="fu">seq_along</span>(outcomes), <span class="cf">function</span>(i) {</span>
+<span id="cb112-2"><a href="#cb112-2" aria-hidden="true" tabindex="-1"></a>  results[[i]]<span class="sc">$</span>metrics <span class="sc">%&gt;%</span></span>
+<span id="cb112-3"><a href="#cb112-3" aria-hidden="true" tabindex="-1"></a>    <span class="fu">mutate</span>(<span class="at">outcome =</span> outcomes[i])</span>
+<span id="cb112-4"><a href="#cb112-4" aria-hidden="true" tabindex="-1"></a>}) <span class="sc">%&gt;%</span></span>
+<span id="cb112-5"><a href="#cb112-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(outcome, model, RMSE, Rsq)</span>
+<span id="cb112-6"><a href="#cb112-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb112-7"><a href="#cb112-7" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"Summary of Model Performance:</span><span class="sc">\n</span><span class="st">"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Summary of Model Performance:</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb114"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb114-1"><a href="#cb114-1" aria-hidden="true" tabindex="-1"></a><span class="fu">print</span>(all_metrics)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 15 × 4
+   outcome                  model              RMSE     Rsq
+   &lt;chr&gt;                    &lt;chr&gt;             &lt;dbl&gt;   &lt;dbl&gt;
+ 1 depression               KNN                1.30 0.0540 
+ 2 depression               Linear Regression  1.26 0.0968 
+ 3 depression               Regression Tree    1.20 0.162  
+ 4 worry                    KNN                1.34 0.0163 
+ 5 worry                    Linear Regression  1.23 0.0838 
+ 6 worry                    Regression Tree    1.25 0.0530 
+ 7 concentration_difficulty KNN                1.38 0.0341 
+ 8 concentration_difficulty Linear Regression  1.38 0.0484 
+ 9 concentration_difficulty Regression Tree    1.29 0.0997 
+10 restlessness             KNN                1.20 0.0400 
+11 restlessness             Linear Regression  1.12 0.141  
+12 restlessness             Regression Tree    1.14 0.118  
+13 comparison_freq          KNN                1.49 0.00958
+14 comparison_freq          Linear Regression  1.37 0.0940 
+15 comparison_freq          Regression Tree    1.46 0.00405</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb116"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb116-1"><a href="#cb116-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Visualize overall performance</span></span>
+<span id="cb116-2"><a href="#cb116-2" aria-hidden="true" tabindex="-1"></a>performance_plot <span class="ot">&lt;-</span> <span class="fu">ggplot</span>(all_metrics, <span class="fu">aes</span>(<span class="at">x =</span> outcome, <span class="at">y =</span> RMSE, <span class="at">fill =</span> model)) <span class="sc">+</span></span>
+<span id="cb116-3"><a href="#cb116-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_bar</span>(<span class="at">stat =</span> <span class="st">"identity"</span>, <span class="at">position =</span> <span class="st">"dodge"</span>) <span class="sc">+</span></span>
+<span id="cb116-4"><a href="#cb116-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">"Model Performance (RMSE) Across Outcomes"</span>,</span>
+<span id="cb116-5"><a href="#cb116-5" aria-hidden="true" tabindex="-1"></a>       <span class="at">x =</span> <span class="st">"Mental Health Outcome"</span>, <span class="at">y =</span> <span class="st">"RMSE"</span>) <span class="sc">+</span></span>
+<span id="cb116-6"><a href="#cb116-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_minimal</span>() <span class="sc">+</span></span>
+<span id="cb116-7"><a href="#cb116-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(<span class="at">axis.text.x =</span> <span class="fu">element_text</span>(<span class="at">angle =</span> <span class="dv">45</span>, <span class="at">hjust =</span> <span class="dv">1</span>))</span>
+<span id="cb116-8"><a href="#cb116-8" aria-hidden="true" tabindex="-1"></a><span class="fu">print</span>(performance_plot)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="index_files/figure-html/unnamed-chunk-8-6.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
 </section>
 <section id="insights" class="level2">
 <h2 class="anchored" data-anchor-id="insights">Insights</h2>
+<p>Platform Usage Patterns: The EDA showed that Facebook was the most commonly used platform, with approximately 8 in ten people using it , followed by Discord with 4 in ten and Reddit with 3 in ten. This suggests a preference for Facebook, potentially due to its widespread availability and social networking features, while Discord’s lower usage may reflect its niche appeal among younger or tech-savvy respondents. Time Spent on Social Media: The distribution of time spent on social media indicated that most respondents spent More than 5 hours per day, but a median of 2 to three hours, the portion exceeding 5 hours daily around 25 percent. This heavy usage indicates there is enough saturation to determine if there is a correlation. Mental Health Correlations: Scatter plots and correlation analysis revealed a weak positive correlation between negative mental health outcomes between time spent on social media and mental health outcomes. For instance, time spent was moderately correlated with depression suggesting that increased usage may exacerbate these symptoms. Model Performance: The modeling phase evaluated Linear Regression, KNN, and Regression Trees for predicting five mental health outcomes (depression, worry, concentration difficulty, restlessness, comparison frequency) using predictors like time_spent, platform_facebook, platform_reddit, platform_discord, age, gender, occupation, and affiliation. Linear Regression: Achieved an RMSE of 1.374, indicating medium to weak] predictive power. This model performed best for restlessness,but was similar throughout. KNN: Recorded an RMSE of 1.49, performing better for restlessness due to a particularly strong relation in restlessness Regression Trees: Yielded an RMSE of 1.46, with weak and roughly equal rmse throughout. Overall, our model showed the lowest RMSE for Linear regression, suggesting it best captures the relationship between social media usage and mental health for this dataset. These findings suggest that time spent on social media is a stronger predictor of mental health outcomes than platform type, with potentially amplifying effects like comparison frequency. The models supported some of these relationships, though accuracy is fairly weak due in part to human perception and variability of such.</p>
 <section id="limitations-and-future-work" class="level3">
 <h3 class="anchored" data-anchor-id="limitations-and-future-work">Limitations and Future Work</h3>
+<p>This dataset was both a snapshot, regionally located, and had a relatively small size combined with a fairly small scope and self reported metrics. These make it harder to track the the change over time, whether the trends seen in the scope exists beyond it and whether this is a trend that persisted over time. For future work I would recommend collecting more data and expirements of large samples of people who dont vs do use social media, though this may be difficult to do considering its near ubiquity in everyday life.</p>
 </section>
 <section id="reflection-optional-subsection" class="level3">
 <h3 class="anchored" data-anchor-id="reflection-optional-subsection">Reflection (Optional Subsection)</h3>

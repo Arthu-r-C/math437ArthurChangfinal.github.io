@@ -43,6 +43,8 @@ library(naniar)
 library(tidyr)
 library(stringr)
 library(purrr)
+library(tidymodels)
+library(recipes)
 ```
 
 
@@ -58,6 +60,7 @@ library(purrr)
 [Naniar] [tidyr]https://tidyr.tidyverse.org//) | remove missing data |
 [Stringr](https://cran.r-project.org/web/packages/corrplot/vignettes/corrplot-intro.html/) | to create dummy variables from responses. |
 [tidyr]https://tidyr.tidyverse.org//) | remove missing data |
+[tidymodels]https://tidyr.tidyverse.org//) | to facilitate modeling |
 
 ## Data Description
 I am using the ‘Social Media and Mental Health’ dataset, compiled by Souvik Ahmed and sourced from Kaggle (https://www.kaggle.com/datasets/souvikahmed071/social-media-and-mental-health?select=smmh.csv),. The dataset was acquired through an online survey, likely administered via Google Forms, and distributed via fliers at the University of Liberal Arts Bangladesh (ULAB) in Dhaka.
@@ -410,9 +413,217 @@ print(age_outcome_scatter)
 ```
 
 ## Modeling
+```{r}
+# Set seed for reproducibility
+set.seed(69)
+
+# 1. Data Preparation
+cat("Step 1: Preparing Data for Modeling\n")
+
+# Select relevant variables for modeling
+model_data <- smmh_clean %>%
+  select(
+    time_spent, platform_facebook, platform_reddit, platform_discord,
+    depression, worry, concentration_difficulty, restlessness, comparison_freq,
+    age, gender, occupation, affiliation
+  ) %>%
+  # Ensure no missing values in predictors and outcomes
+  drop_na(time_spent, platform_facebook, platform_reddit, platform_discord, age, gender, occupation, affiliation,
+          depression, worry, concentration_difficulty, restlessness, comparison_freq)
+
+# Check if data is sufficient
+cat("Rows in model_data:", nrow(model_data), "\n")
+if (nrow(model_data) == 0) {
+  stop("Error: model_data has no rows after drop_na(). Check missing data.")
+}
+
+# Verify platform variables exist
+cat("Available columns:", colnames(model_data), "\n")
+if (!all(c("platform_facebook", "platform_reddit", "platform_discord") %in% colnames(model_data))) {
+  stop("Error: One or more platform variables (platform_facebook, platform_reddit, platform_discord) are missing. Check data wrangling.")
+}
+
+# Split data into training (70%) and testing (30%) sets
+data_split <- initial_split(model_data, prop = 0.7, strata = depression)
+train_data <- training(data_split)
+test_data <- testing(data_split)
+
+cat("Training set rows:", nrow(train_data), "\n")
+cat("Testing set rows:", nrow(test_data), "\n")
+
+# Define mental health outcomes to model
+outcomes <- c("depression", "worry", "concentration_difficulty", "restlessness", "comparison_freq")
+
+# 2. Modeling Function
+cat("Step 2: Defining Modeling Function\n")
+
+# Function to fit and evaluate models for a given outcome
+fit_and_evaluate <- function(outcome) {
+  cat("\nModeling for outcome:", outcome, "\n")
+  
+  # Verify outcome exists in test_data
+  if (!outcome %in% colnames(test_data)) {
+    stop("Error: Outcome ", outcome, " not found in test_data.")
+  }
+  
+  # Create recipe for preprocessing
+  model_recipe <- recipe(as.formula(paste(outcome, "~ time_spent + platform_facebook + platform_reddit + platform_discord + age + gender + occupation + affiliation")), 
+                         data = train_data) %>%
+    step_dummy(all_nominal_predictors()) %>%           # Convert categorical variables to dummy variables
+    step_zv(all_predictors()) %>%                     # Remove zero-variance predictors
+    step_corr(all_numeric_predictors(), threshold = 0.9) %>%  # Remove highly correlated predictors
+    step_normalize(all_numeric_predictors())          # Normalize numeric predictors
+  
+  # Define models
+  # Linear Regression
+  lm_spec <- linear_reg() %>%
+    set_engine("lm")
+  
+  # KNN
+  knn_spec <- nearest_neighbor(neighbors = tune()) %>%
+    set_engine("kknn") %>%
+    set_mode("regression")
+  
+  # Regression Tree
+  tree_spec <- decision_tree(tree_depth = tune(), min_n = tune()) %>%
+    set_engine("rpart") %>%
+    set_mode("regression")
+  
+  # Create workflows
+  lm_workflow <- workflow() %>%
+    add_recipe(model_recipe) %>%
+    add_model(lm_spec)
+  
+  knn_workflow <- workflow() %>%
+    add_recipe(model_recipe) %>%
+    add_model(knn_spec)
+  
+  tree_workflow <- workflow() %>%
+    add_recipe(model_recipe) %>%
+    add_model(tree_spec)
+  
+  # Cross-validation
+  cv_folds <- vfold_cv(train_data, v = 5)
+  
+  # Tune KNN
+  knn_grid <- grid_regular(
+    neighbors(range = c(3, 15)),
+    levels = 3
+  )
+  
+  knn_tune <- tune_grid(
+    knn_workflow,
+    resamples = cv_folds,
+    grid = knn_grid,
+    metrics = metric_set(rmse, rsq)
+  )
+  
+  # Tune Regression Tree
+  tree_grid <- grid_regular(
+    tree_depth(range = c(3, 10)),
+    min_n(range = c(5, 20)),
+    levels=3
+  )
+  
+  tree_tune <- tune_grid(
+    tree_workflow,
+    resamples = cv_folds,
+    grid = tree_grid,
+    metrics = metric_set(rmse, rsq)
+  )
+  
+  # Fit Linear Regression (no tuning needed)
+  lm_fit <- fit(lm_workflow, train_data)
+  
+  # Select best KNN and Tree models
+  best_knn <- finalize_workflow(knn_workflow, select_best(knn_tune, metric = "rmse")) %>%
+    fit(train_data)
+  
+  best_tree <- finalize_workflow(tree_workflow, select_best(tree_tune, metric = "rmse")) %>%
+    fit(train_data)
+  
+  # Evaluate on test set
+  test_predictions <- bind_rows(
+    tibble(
+      .pred = predict(lm_fit, test_data)$.pred,
+      model = "Linear Regression",
+      actual = test_data[[outcome]]
+    ),
+    tibble(
+      .pred = predict(best_knn, test_data)$.pred,
+      model = "KNN",
+      actual = test_data[[outcome]]
+    ),
+    tibble(
+      .pred = predict(best_tree, test_data)$.pred,
+      model = "Regression Tree",
+      actual = test_data[[outcome]]
+    )
+  )
+  
+  # Calculate performance metrics
+  metrics <- test_predictions %>%
+    group_by(model) %>%
+    summarise(
+      RMSE = sqrt(mean((.pred - actual)^2)),
+      Rsq = cor(.pred, actual)^2
+    )
+  
+  cat("Performance metrics for", outcome, ":\n")
+  print(metrics)
+  
+  # Visualize predictions vs. actual
+  pred_plot <- ggplot(test_predictions, aes(x = actual, y = .pred, color = model)) +
+    geom_point(alpha = 0.5) +
+    geom_abline(slope = 1, intercept = 0, linetype = "dashed") +
+    facet_wrap(~ model) +
+    labs(title = paste("Predictions vs. Actual for", outcome),
+         x = "Actual Score", y = "Predicted Score") +
+    theme_minimal()
+  print(pred_plot)
+  
+  return(list(metrics = metrics, predictions = test_predictions))
+}
+
+# 3. Fit Models for All Outcomes
+cat("Step 3: Fitting Models for All Outcomes\n")
+results <- map(outcomes, fit_and_evaluate)
+
+# 4. Summarize Results
+cat("Step 4: Summarizing Results Across Outcomes\n")
+all_metrics <- map_dfr(seq_along(outcomes), function(i) {
+  results[[i]]$metrics %>%
+    mutate(outcome = outcomes[i])
+}) %>%
+  select(outcome, model, RMSE, Rsq)
+
+cat("Summary of Model Performance:\n")
+print(all_metrics)
+
+# Visualize overall performance
+performance_plot <- ggplot(all_metrics, aes(x = outcome, y = RMSE, fill = model)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Model Performance (RMSE) Across Outcomes",
+       x = "Mental Health Outcome", y = "RMSE") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+print(performance_plot)
+```
+
 
 ## Insights
+Platform Usage Patterns: The EDA showed that Facebook was the most commonly used platform, with approximately 8 in ten people using it , followed by Discord with 4 in ten  and Reddit with 3 in ten. This suggests a preference for Facebook, potentially due to its widespread availability and social networking features, while Discord’s lower usage may reflect its niche appeal among younger or tech-savvy respondents.
+Time Spent on Social Media: The distribution of time spent on social media indicated that most respondents spent More than 5 hours per day, but a median of 2 to three hours, the portion exceeding 5 hours daily around 25 percent. This heavy usage indicates there is enough saturation to determine if there is a correlation.
+Mental Health Correlations: Scatter plots and correlation analysis revealed a weak positive correlation between negative mental health outcomes between time spent on social media and mental health outcomes. For instance, time spent was moderately correlated with depression suggesting that increased usage may exacerbate these symptoms. 
+Model Performance: The modeling phase evaluated Linear Regression, KNN, and Regression Trees for predicting five mental health outcomes (depression, worry, concentration difficulty, restlessness, comparison frequency) using predictors like time_spent, platform_facebook, platform_reddit, platform_discord, age, gender, occupation, and affiliation.
+Linear Regression: Achieved an RMSE of 1.374, indicating medium to weak] predictive power. This model performed best for restlessness,but was similar throughout.
+KNN: Recorded an RMSE of 1.49, performing better for restlessness due to a particularly strong relation in restlessness
+Regression Trees: Yielded an RMSE of 1.46, with weak and roughly equal rmse throughout.
+Overall, our model showed the lowest RMSE for Linear regression, suggesting it best captures the relationship between social media usage and mental health for this dataset.
+These findings suggest that time spent on social media is a stronger predictor of mental health outcomes than platform type, with potentially amplifying effects like comparison frequency. The models supported some of these relationships, though accuracy is fairly weak due in part to human perception and variability of such.
+
 
 ### Limitations and Future Work
+This dataset was both a snapshot, regionally located, and had a relatively small size combined with a fairly small scope and self reported metrics. These make it harder to track the the change over time, whether the trends seen in the  scope exists beyond it and whether this is a trend that persisted over time. For future work I would recommend collecting more data and expirements of large samples of people who dont vs do use social media, though this may be difficult to do considering its near ubiquity in everyday life.
 
 ### Reflection (Optional Subsection)
